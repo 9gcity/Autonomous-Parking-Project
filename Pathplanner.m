@@ -422,12 +422,12 @@ classdef Pathplanner
             end
             last_dist = 0;
             for i = 1:(N-1)
-                waypoints(i,5) = last_dist + sqrt(((waypoints(i,1) - waypoints(i+1,1))^2) + (waypoints(i,2) - waypoints(i+1,2))^2);
+                waypoints(i,5) = last_dist + sqrt(((waypoints(i,1) - waypoints(i+1,1))^2) + ((waypoints(i,4) - waypoints(i+1,4))^2));
                 last_dist = waypoints(i, 5);
             end
         end
         
-        function [time_arr, vel_prof] = velocityProfilerv5(obj, waypoints, start, goal, fric)
+        function [dist, time_arr, vel_prof] = velocityProfilerv5(obj, waypoints, start, goal, fric)
             [minc, maxc] = bounds(waypoints(:,3));
             minc = sqrt((fric*9.81)/abs(minc));
             maxc = sqrt((fric*9.81)/abs(maxc));
@@ -445,10 +445,10 @@ classdef Pathplanner
             %Scenario Determination
             swcase = 0;
             c1 = (v0/2)*((v0/maxa) + (maxa/jerk));
-            if (v0 >= ((maxa^2)/jerk) && waypoints(N-1,5) > c1) || v0 < ((maxa^2)/jerk) && waypoints(N-1,5) > v0*sqrt(v0/jerk)
+            if (v0 >= ((maxa^2)/jerk) && waypoints(N-1,5) > c1) || (v0 < ((maxa^2)/jerk) && waypoints(N-1,5) > v0*sqrt(v0/jerk))
                 s03 = (maxv + v0)*sqrt((maxv - v0)/jerk);
-                s47 = (maxv*0.5)*((maxv/maxa)+(maxa/jerk));
-                if maxv <= (v0 + 2*((maxa)/(2*jerk))) && waypoints(N-1,5) >= (s03 + s47)
+                s47 = (maxv*0.5)*(((maxv - 2*vf)/maxa)+(maxa/jerk));
+                if maxv <= (v0 + ((maxa^2)/jerk)) && waypoints(N-1,5) >= (s03 + s47)
                     swcase = 3; %Case C
                 else
                     c1 = (2*maxa*((maxa/jerk)^2) + 5*v0*(maxa/jerk) + 2*(v0^2)/maxa);
@@ -472,12 +472,9 @@ classdef Pathplanner
                     t3i = t1i;
                     v1 = v0 + ((maxa^2)/(2*jerk));
                     v2 = maxv - ((maxa^2)/(2*jerk));
-                    v3 = maxv;
                     t2i = (v2 - v1)/maxa;
                     s03 = 0.5*maxv*(((maxv - 2*v0)/maxa) + (maxa/jerk));
-                    
                     %Deacceleration part
-                    v4 = maxv;
                     t7i = t1i;
                     t5i = t1i;
                     v6 = vf + ((maxa^2)/(2*jerk));
@@ -485,7 +482,6 @@ classdef Pathplanner
                     t6i = (v5 - v6)/maxa;
                     s47 = 0.5*maxv*(((maxv - 2*vf)/maxa) + (maxa/jerk));
                     t4i = (waypoints(N-1,5) - s03 - s47)/maxv;
-                    
                     %Outputs
                     total_time = (t1i + t2i + t3i + t4i + t5i + t6i + t7i);
                     t1 = linspace(0, t1i, round(N * t1i/total_time));
@@ -507,10 +503,7 @@ classdef Pathplanner
                         (waypoints(N-1,5) == (V3*t1i) + (V3*0.5*T2) + (V3*0.5*(((V3 - 2*vf)/maxa) + (maxa/jerk))))];
                     ans1 = solve(eqn1, [V3 V2 T2]);
                     t2i = ans1.T2(ans1.T2 > 0);
-                    v2 = ans1.V2(ans1.V2 > 0);
                     v3 = ans1.V3(ans1.V3 > 0); %v3 < vmax in this case
-                    t4i = 0;
-                    
                     %Deacceleration part
                     v4 = v3;
                     t7i = t1i;
@@ -518,13 +511,12 @@ classdef Pathplanner
                     v6 = vf + ((maxa^2)/(2*jerk));
                     v5 = v4 - v6;
                     t6i = (v5 - v6)/maxa;
-                    
                     %Outputs
                     total_time = (t1i + t2i + t3i + t5i + t6i + t7i);
                     t1 = linspace(0, t1i, round(N * t1i/total_time));
                     t2 = linspace(0, t2i, round(N * t2i/total_time));
                     t3 = linspace(0, t3i, round(N * t3i/total_time));
-                    t4 = 0;
+                    t4 = [];
                     t5 = linspace(0, t5i, round(N * t5i/total_time));
                     t6 = linspace(0, t6i, round(N * t6i/total_time));
                     t7 = linspace(0, t7i, round(N - N * (total_time - t7i)/total_time));
@@ -533,36 +525,31 @@ classdef Pathplanner
                     %Acceleration part
                     t1i = sqrt((maxv - v0)/jerk);
                     v1 = v0 + (0.5*jerk*(t1i^2));
-                    v3 = maxv;
                     t3i = t1i;
-                    s03 = 2*t1i*v1;
-                    
+                    s03 = 2*t1i*v1;                    
                     %Deacceleration part
-                    v4 = maxv;
-                    t7i = maxa/jerk;
-                    t5i = t7i;
-                    v6 = vf + ((maxa^2)/(2*jerk));
-                    v5 = maxv - ((maxa^2)/(2*jerk));
-                    t6i = (v5 - v6)/maxa;
+%                     v4 = maxv;
+%                     t7i = maxa/jerk;
+%                     t5i = t7i;
+%                     v6 = vf + ((maxa^2)/(2*jerk));
+%                     v5 = maxv - ((maxa^2)/(2*jerk));
+%                     t6i = 0;%(v5 - v6)/maxa;
                     s47 = 0.5*maxv*(((maxv - 2*vf)/maxa) + (maxa/jerk));
                     t4i = (waypoints(N-1,5) - s03 - s47)/maxv;
-                    
+                    t7i = sqrt((maxv - vf)/jerk);
+                    v6 = v0 + (0.5*jerk*(t1i^2));
+                    %v3 = maxv;
+                    t5i = t7i;
+                    %s03 = 2*t1i*v1;
                     %Outputs
-%                     t1 = linspace(0, t1i, N/6);
-%                     t2 = 0;
-%                     t3 = linspace(0, t3i, N/6);
-%                     t4 = linspace(0, t4i, N/6);
-%                     t5 = linspace(0, t5i, N/6);
-%                     t6 = linspace(0, t6i, N/6);%Since maximum deacceleration is not reached
-%                     t7 = linspace(0, t7i, (N - (5*N/6)));
-                    
-                    total_time = (t1i + t3i + t4i + t5i + t6i + t7i);
+                    total_time = (t1i + t3i + t4i + t5i + t7i);
+                    %total_time = (t1i + t3i + t4i + t5i + t6i + t7i);
                     t1 = linspace(0, t1i, round(N * t1i/total_time));
-                    t2 = 0;
+                    t2 = [];
                     t3 = linspace(0, t3i, round(N * t3i/total_time));
                     t4 = linspace(0, t4i, round(N * t4i/total_time));
                     t5 = linspace(0, t5i, round(N * t5i/total_time));
-                    t6 = linspace(0, t6i, round(N * t6i/total_time));
+                    t6 = [];%linspace(0, t6i, round(N * t6i/total_time));
                     t7 = linspace(0, t7i, round(N - N * (total_time - t7i)/total_time));
                     
                 case 4 %Case D
@@ -577,30 +564,20 @@ classdef Pathplanner
                         eqn = (waypoints(N-1,5) == (V3 + v0)*sqrt((V3 - v0)/jerk) + (V3 + vf)*sqrt((V3 - vf)/jerk));
                     end
                     ansx = solve(eqn, V3);
-                    v3 = ansx.V3(ansx.V3 > 0);
+                    v3 = ansx;%.V3(ansx.V3 > 0);
                     t1i = sqrt((v3 - v0)/jerk);
                     t3i = t1i;
-                    
                     %Deacceleration part
                     t7i = sqrt((v3 - vf)/jerk);
                     t5i = t7i;
-                    
                     %Outputs
-%                     t1 = linspace(0, t1i, N/4);
-%                     t2 = 0;
-%                     t3 = linspace(0, t3i, N/4);
-%                     t4 = 0;
-%                     t5 = linspace(0, t5i, N/4);
-%                     t6 = 0;
-%                     t7 = linspace(0, t7i, (N - (3*N/4)));
-                    
                     total_time = (t1i + t3i + t5i + t7i);
                     t1 = linspace(0, t1i, round(N * t1i/total_time));
-                    t2 = 0;
+                    t2 = [];
                     t3 = linspace(0, t3i, round(N * t3i/total_time));
-                    t4 = 0;
+                    t4 = [];
                     t5 = linspace(0, t5i, round(N * t5i/total_time));
-                    t6 = 0;
+                    t6 = [];
                     t7 = linspace(0, t7i, round(N - N * (total_time - t7i)/total_time));
                 
                 case 5 %Case E 
@@ -608,49 +585,48 @@ classdef Pathplanner
                     %started immediately
                     %Deacceleration part
                     if v0 >= ((maxa^2)/jerk)
-                        s47 = 0.5*v0*(((v0 - 2*vf)/maxa) + (maxa/jerk));
+%                         s47 = 0.5*v0*(((v0 - 2*vf)/maxa) + (maxa/jerk));
                         t7i = maxa/jerk;
                         t5i = t7i;
                     else
-                        s47 = (v0 + vf)*sqrt((v0 + vf)/jerk);
+%                         s47 = (v0 + vf)*sqrt((v0 + vf)/jerk);
                         t7i = sqrt((v0 - vf)/jerk);
                         t5i = t7i;
                     end  
-                    
                     %Outputs
-%                     t1 = 0;
-%                     t2 = 0;
-%                     t3 = 0;
-%                     t4 = 0;
-%                     t5 = linspace(0, t5, N/2);
-%                     t6 = 0;%Since maximum deacceleration is not reached
-%                     t7 = linspace(0, t7, (N - N/2));
-                    
                     total_time = (t5i + t7i);
-                    t1 = 0;
-                    t2 = 0;
-                    t3 = 0;
-                    t4 = 0;
+                    t1 = [];
+                    t2 = [];
+                    t3 = [];
+                    t4 = [];
                     t5 = linspace(0, t5i, round(N * t5i/total_time));
-                    t6 = 0;
+                    t6 = [];
                     t7 = linspace(0, t7i, round(N - N * (total_time - t7i)/total_time));
             end
-            
-            vel_prof = 0;
-            time_arr = 0;
+  
+            vel_prof = [];
+            time_arr = [];
             vel_last = v0;
-            t_temp = 0;
             a_last = 0;
-            
+            dist = [];
+            dist_last = 0;
             if ~isempty(t1)
                 vel_prof = v0 + 0.5*jerk*(t1.^2);
                 vel_last = vel_prof(numel(vel_prof));
                 a_last = jerk*t1(numel(t1));
                 time_arr = t1;
+                
+                dist = v0*t1 + (1/6)*jerk*(t1.^3);
+                dist_last = dist(numel(dist));
             end
             if ~isempty(t2)
                 vel_temp = vel_last + a_last*t2;
                 vel_prof = [vel_prof, vel_temp];
+                
+                dist_temp = dist_last + vel_last*t2 + (1/2)*a_last*(t2.^2);
+                dist_last = dist_temp(numel(dist_temp));
+                dist = [dist, dist_temp];
+                
                 vel_last = vel_temp(numel(vel_temp));
                 t_temp = t2 + time_arr(numel(time_arr));
                 time_arr = [time_arr, t_temp];
@@ -659,6 +635,11 @@ classdef Pathplanner
             if ~isempty(t3)
                 vel_temp = vel_last + a_last*t3 - 0.5*jerk*(t3.^2);
                 vel_prof = [vel_prof, vel_temp];
+                
+                dist_temp = dist_last + vel_last*t3 + (1/2)*a_last*(t3.^2) - (1/6)*jerk*(t3.^3);
+                dist_last = dist_temp(numel(dist_temp));
+                dist = [dist, dist_temp];
+                
                 vel_last = vel_temp(numel(vel_temp));
                 t_temp = t3 + time_arr(numel(time_arr));
                 time_arr = [time_arr, t_temp];
@@ -669,6 +650,11 @@ classdef Pathplanner
                 %change vel_last
                 vel_temp = repmat(vel_last, 1, numel(t4));
                 vel_prof = [vel_prof, vel_temp];
+                
+                dist_temp = dist_last + vel_last*t4;
+                dist_last = dist_temp(numel(dist_temp));
+                dist = [dist, dist_temp];
+                
                 t_temp = t4 + time_arr(numel(time_arr));
                 time_arr = [time_arr, t_temp];
                 a_last = 0;
@@ -676,14 +662,28 @@ classdef Pathplanner
             if ~isempty(t5)
                 vel_temp = vel_last - 0.5*jerk*(t5.^2);
                 vel_prof = [vel_prof, vel_temp];
+                
+                dist_temp = dist_last + vel_last*t5 - (1/6)*jerk*(t5.^3);
+                dist_last = dist_temp(numel(dist_temp));
+                dist = [dist, dist_temp];
+                
                 vel_last = vel_temp(numel(vel_temp));
-                t_temp = t5 + time_arr(numel(time_arr));
+                if isempty(time_arr)
+                    t_temp = t5;
+                else
+                    t_temp = t5 + time_arr(numel(time_arr));
+                end
                 time_arr = [time_arr, t_temp];
                 a_last = jerk*t5(numel(t5));
             end
             if ~isempty(t6)
                 vel_temp = vel_last - a_last*t6;
                 vel_prof = [vel_prof, vel_temp];
+                
+                dist_temp = dist_last + vel_last*t6 - (1/2)*a_last*(t6.^2);
+                dist_last = dist_temp(numel(dist_temp));
+                dist = [dist, dist_temp];
+                
                 vel_last = vel_temp(numel(vel_temp));
                 t_temp = t6 + time_arr(numel(time_arr));
                 time_arr = [time_arr, t_temp];
@@ -692,6 +692,10 @@ classdef Pathplanner
             if ~isempty(t7)
                 vel_temp = vel_last - a_last*t7 + 0.5*jerk*(t7.^2);
                 vel_prof = [vel_prof, vel_temp];
+                
+                dist_temp = dist_last + vel_last*t7 - (1/2)*a_last*(t7.^2) + (1/6)*jerk*(t7.^3);
+                dist = [dist, dist_temp];
+                
                 t_temp = t7 + time_arr(numel(time_arr));
                 time_arr = [time_arr, t_temp];
             end
