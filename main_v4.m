@@ -17,11 +17,9 @@ goal = Pose(0, 0, 0, 0, 0, 0);
 start = Pose(10, 10, deg2rad(0), 0, 0, 0);
 parkspace = ParkingLot(4.8, 2.4, 0, 0);
 waypoints = fifthorderTrack(pathp, start, goal);
-waypoints(:,2) = deg2rad(waypoints(:,2));
 [dist, time_arr, vel_prof, acc_prof] = velocityProfilerv5(pathp, waypoints, start, goal, fric); 
 vel_prof = -vel_prof;
-%acc_prof = -acc_prof;
-acc_prof = flip(acc_prof);
+acc_prof = -acc_prof;
 % figure;
 % plot(waypoints(:,4), waypoints(:,1), '--bo'); %1st Column is y, 4th is x
 % grid on;
@@ -91,7 +89,7 @@ nx4 = numel(x4);
 nx5 = numel(x5);
 
 Q = diag([1,1,1,1,1,1]);
-R = diag([0.1,100]);
+R = diag([0.001,1]);
 [A,B,K,e,const] = linearization_V7(x3, x4, x5, pathp, Q, R);
 i2 = recursive_search(x0(3,1), x3);
 i2 = find(x3 == i2);
@@ -103,7 +101,10 @@ i1 = recursive_search(x0(5,1), x5);
 i1 = find(x5 == i1);
 dt = time_arr(2) - time_arr(1);
 
-for i0 = 1:(numel(time_arr) - 2)
+check = 0;
+i0 = 1;
+ref_count = 2;
+while check == 0
     %NEED TO SET THE A AND B MATRICES ACCORDING TO THE VALUES OF X3 X4 AND
     %U1 
     
@@ -138,14 +139,22 @@ for i0 = 1:(numel(time_arr) - 2)
     i3 = recursive_search(x0(4,i0), x4);
     i3 = find(x4 == i3);
     
+    i0 = i0+1;
     
-    xref = [waypoints(i0+2,4); %Reference X coord
-            waypoints(i0+2,1); %Ref y coord
-            waypoints(i0+2,2); %Ref orientation
-            pathp.whlbase./waypoints(i0+2,3); %Ref steering angle
-            vel_prof(i0 + 2);
-            acc_prof(i0 + 2)]; %Ref velocity
-    u_temp = K(:,:,i1,i2,i3)*(xref - x0(:, i0 + 1));
+    if (xref(1) - 0.1) < x0(1, i0-1) < (xref(1) + 0.1) && (xref(2) - 0.1) < x0(2, i0-1) < (xref(2) + 0.1) && ref_count < 200
+        ref_count = ref_count + 1;
+        xref = [waypoints(ref_count,4); %Reference X coord
+                waypoints(ref_count,1); %Ref y coord
+                waypoints(ref_count,2); %Ref orientation
+                pathp.whlbase/waypoints(ref_count,3); %Ref steering angle
+                vel_prof(ref_count);
+                acc_prof(ref_count)]; %Ref velocity
+    end
+    
+    if ((goal.x - 0.1) < x0(1, i0-1) < (goal.x + 0.1) && (goal.y - 0.1) < x0(2, i0-1) < (goal.y + 0.1)) %|| i0 == 10000
+        check = 1;
+    end
+    u_temp = K(:,:,i1,i2,i3)*(xref - x0(:, i0));
 end
 
 figure('Name', 'Comparison between the reference and the actual path');
